@@ -15,7 +15,7 @@ namespace EmotePlusPlus.Services
     {
         private readonly DiscordSocketClient _discord;
         private readonly CommandService _commands;
-        private readonly LiteDatabase _database;
+        private readonly DatabaseService _database;
 
         private readonly IServiceProvider _services;
 
@@ -23,7 +23,7 @@ namespace EmotePlusPlus.Services
         {
             _discord = services.GetRequiredService<DiscordSocketClient>();
             _commands = services.GetRequiredService<CommandService>();
-            _database = services.GetRequiredService<LiteDatabase>();
+            _database = services.GetRequiredService<DatabaseService>();
             _services = services;
 
             // Hook CommandExecuted to handle post-command-execution logic.
@@ -47,7 +47,9 @@ namespace EmotePlusPlus.Services
             if (message.Source != MessageSource.User) return;
 
             var context = new SocketCommandContext(_discord, message);
-            await context.Channel.SendMessageAsync("Ping pong");
+
+            _database.Update(msg);
+
             int argPos = 0;
             if (!message.HasMentionPrefix(_discord.CurrentUser, ref argPos)
                 && !message.HasCharPrefix('+', ref argPos)) return;

@@ -63,7 +63,8 @@ namespace EmotePlusPlus
                 // Config
                 .AddSingleton(config)
                 // Database
-                .AddSingleton(new LiteDatabase(new ConnectionString() { Filename = "bot.db", UtcDate = true }))
+                .AddSingleton(new LiteDatabase(new ConnectionString() { Filename = "database.db", UtcDate = true }))
+                .AddSingleton<DatabaseService>()
                 .BuildServiceProvider();
         }
     }
