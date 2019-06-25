@@ -3,8 +3,8 @@ using Discord.Commands;
 using Discord.WebSocket;
 using EmotePlusPlus.Services;
 using System;
+using System.Diagnostics;
 using System.Linq;
-using System.Text;
 using System.Threading.Tasks;
 
 namespace EmotePlusPlus.Modules
@@ -13,20 +13,8 @@ namespace EmotePlusPlus.Modules
     {
         public DatabaseService DatabaseService { get; set; }
 
-        [Command("test")]
-        public async Task Test()
-        {
-            await ReplyAsync(DatabaseService.EmoteCount() + "");
-        }
+        #region Server wide commands
 
-        /*
-         * 1) Top, global for the server --
-         * 2) Top of a user, global for the server --
-         * 3) Top of a user, for a specific channel --
-         * 4) ALL OF THE ABOVE WITH ANIMATED FLAG --
-         */
-
-        // 1 both
         [Command("top")]
         public async Task TopAll(int number = 10)
         {
@@ -34,13 +22,13 @@ namespace EmotePlusPlus.Modules
             if (emotes.Any())
             {
                 await ReplyAsync(string.Join("\n", emotes));
-            } else
+            }
+            else
             {
                 await ReplyAsync("No emotes have been used on this server.");
             }
         }
 
-        // 1 normal
         [Command("top normal")]
         public async Task TopNormal(int number = 10)
         {
@@ -55,7 +43,6 @@ namespace EmotePlusPlus.Modules
             }
         }
 
-        // 1 animated
         [Command("top gif")]
         public async Task TopGif(int number = 10)
         {
@@ -70,35 +57,36 @@ namespace EmotePlusPlus.Modules
             }
         }
 
-        // 2 both
+        #endregion
+
+        #region User specific commands
         [Command("top")]
-        public async Task TopUser(int number, IGuildUser user)
+        public async Task TopUserAll(int number, IGuildUser user)
         {
-            var emotes = DatabaseService.GetTopAll(number, user.Id);
+            var emotes = DatabaseService.GetTopUserAll(number, user.Id);
             if (emotes.Any())
             {
                 await ReplyAsync(string.Join("\n", emotes));
             }
         }
 
-        // 2 both
         [Command("top")]
         public async Task TopUserAll(IGuildUser user)
         {
-            var emotes = DatabaseService.GetTopAll(10, user.Id);
+            var emotes = DatabaseService.GetTopUserAll(10, user.Id);
             try
             {
                 if (emotes.Any())
                 {
                     await ReplyAsync(string.Join("\n", emotes));
                 }
-            } catch (ArgumentNullException ex)
+            }
+            catch (ArgumentNullException ex)
             {
                 await ReplyAsync("That user has used no emotes.");
             }
         }
 
-        // 2 normal
         [Command("top normal")]
         public async Task TopUserNormal(int number, IGuildUser user)
         {
@@ -116,7 +104,6 @@ namespace EmotePlusPlus.Modules
             }
         }
 
-        // 2 normal
         [Command("top normal")]
         public async Task TopUserNormal(IGuildUser user)
         {
@@ -134,7 +121,6 @@ namespace EmotePlusPlus.Modules
             }
         }
 
-        // 2 animated
         [Command("top gif")]
         public async Task TopUserGif(int number, IGuildUser user)
         {
@@ -152,7 +138,6 @@ namespace EmotePlusPlus.Modules
             }
         }
 
-        // 2 animated
         [Command("top gif")]
         public async Task TopUserGif(IGuildUser user)
         {
@@ -170,11 +155,63 @@ namespace EmotePlusPlus.Modules
             }
         }
 
-        // 3 both
+        #endregion
+
+        #region Channel specific commands
+
         [Command("top")]
-        public async Task TopUserChannel(int number, IGuildUser user, SocketTextChannel channel)
+        public async Task TopChannelAll(int number, SocketTextChannel channel)
         {
-            var emotes = DatabaseService.GetTopAll(number, user.Id, channel.Id);
+            var emotes = DatabaseService.GetTopChannelAll(number, channel.Id);
+            if (emotes.Any())
+            {
+                await ReplyAsync(string.Join("\n", emotes));
+            }
+            else
+            {
+                await ReplyAsync("There haven't been any emotes used in that channel.");
+            }
+        }
+
+        [Command("top")]
+        public async Task TopChannelAll(SocketTextChannel channel)
+        {
+            var emotes = DatabaseService.GetTopChannelAll(10, channel.Id);
+            if (emotes.Any())
+            {
+                await ReplyAsync(string.Join("\n", emotes));
+            }
+            else
+            {
+                await ReplyAsync("There haven't been any emotes used in that channel.");
+            }
+        }
+
+        #endregion
+
+        #region User and channel specific commands
+
+        [Command("top")]
+        public async Task TopUserChannelAll(int number, IGuildUser user, SocketTextChannel channel)
+        {
+            var emotes = DatabaseService.GetTopUserChannelAll(number, user.Id, channel.Id);
+            try
+            {
+                if (emotes.Any())
+                {
+                    await ReplyAsync(string.Join("\n", emotes));
+                }
+            }
+            catch (ArgumentNullException ex)
+            {
+                await ReplyAsync("There haven't been any emotes used in that channel.");
+            }
+        }
+
+        [Command("top")]
+        public async Task TopUserChannelAll(IGuildUser user, SocketTextChannel channel)
+        {
+            var emotes = DatabaseService.GetTopUserChannelAll(10, user.Id, channel.Id);
             try
             {
                 if (emotes.Any())
@@ -188,25 +225,6 @@ namespace EmotePlusPlus.Modules
             }
         }
 
-        // 3 both
-        [Command("top")]
-        public async Task TopUserChannel(IGuildUser user, SocketTextChannel channel)
-        {
-            var emotes = DatabaseService.GetTopAll(10, user.Id, channel.Id);
-            try
-            {
-                if (emotes.Any())
-                {
-                    await ReplyAsync(string.Join("\n", emotes));
-                }
-            }
-            catch (ArgumentNullException ex)
-            {
-                await ReplyAsync("That user has used no emotes in that channel.");
-            }
-        }
-
-        // 3 normal
         [Command("top normal")]
         public async Task TopUserChannelNormal(int number, IGuildUser user, SocketTextChannel channel)
         {
@@ -224,7 +242,6 @@ namespace EmotePlusPlus.Modules
             }
         }
 
-        // 3 normal
         [Command("top normal")]
         public async Task TopUserChannelNormal(IGuildUser user, SocketTextChannel channel)
         {
@@ -242,7 +259,6 @@ namespace EmotePlusPlus.Modules
             }
         }
 
-        // 3 animated
         [Command("top gif")]
         public async Task TopUserChannelGif(int number, IGuildUser user, SocketTextChannel channel)
         {
@@ -260,7 +276,6 @@ namespace EmotePlusPlus.Modules
             }
         }
 
-        // 3 animated
         [Command("top gif")]
         public async Task TopUserChannelGif(IGuildUser user, SocketTextChannel channel)
         {
@@ -275,6 +290,100 @@ namespace EmotePlusPlus.Modules
             catch (ArgumentNullException ex)
             {
                 await ReplyAsync("That user has used no gif emotes in that channel.");
+            }
+        }
+
+        #endregion
+
+        #region Emote specific commands
+
+        [Command("check")]
+        public async Task CheckEmote(string emoteString)
+        {
+            bool success = Emote.TryParse(emoteString, out Emote emote);
+            if (success)
+            {
+                var result = DatabaseService.GetEmoteData(emote);
+                if (result != null)
+                {
+                    await ReplyAsync(result.ToString());
+                }
+            }
+        }
+
+        [Command("check")]
+        public async Task CheckEmoteUser(string emoteString, IGuildUser user)
+        {
+            bool success = Emote.TryParse(emoteString, out Emote emote);
+            if (success)
+            {
+                var result = DatabaseService.GetEmoteUserData(emote, user.Id);
+                if (result != null)
+                {
+                    await ReplyAsync(result.ToString());
+                }
+            }
+        }
+
+        [Command("check")]
+        public async Task CheckEmoteChannel(string emoteString, SocketTextChannel channel)
+        {
+            bool success = Emote.TryParse(emoteString, out Emote emote);
+            if (success)
+            {
+                var result = DatabaseService.GetEmoteChannelData(emote, channel.Id);
+                if (result != null)
+                {
+                    await ReplyAsync(result.ToString());
+                }
+            }
+        }
+
+        #endregion
+
+        [Command("initialize", RunMode = RunMode.Async)]
+        [RequireUserPermission(GuildPermission.Administrator)]
+        public async Task GetHistory()
+        {
+            var channels = Context.Guild.Channels.Where(x => x.GetType() == typeof(SocketTextChannel));
+            foreach (var channel in channels)
+            {
+                Console.WriteLine(channel.Name);
+
+                var lastUpdate = DatabaseService.LastChannelUpdate(channel.Id);
+
+                var firstMessage = (await (channel as ISocketMessageChannel).GetMessagesAsync(1).FlattenAsync()).First();
+                if (firstMessage.Tags.Any() && firstMessage.Timestamp > lastUpdate)
+                    DatabaseService.Update(firstMessage.Tags, firstMessage.Author.Id, firstMessage.Channel.Id);
+
+                var lastMessage = firstMessage;
+                bool done = false;
+
+                while (!done)
+                {
+                    Console.Write(".");
+                    var messages = await (channel as ISocketMessageChannel).GetMessagesAsync(lastMessage, Direction.Before, 100, CacheMode.AllowDownload).FlattenAsync();
+                    foreach (var message in messages)
+                    {
+                        if (message.Tags.Any() && message.Timestamp > lastUpdate)
+                            DatabaseService.Update(message.Tags, message.Author.Id, message.Channel.Id);
+                    }
+
+                    if (!messages.Any())
+                    {
+                        done = true;
+                    }
+                    else
+                    {
+                        lastMessage = messages.Last();
+                        if (lastMessage.Timestamp < lastUpdate)
+                        {
+                            done = true;
+                        }
+                    }
+                }
+
+                DatabaseService.UpdateLastChannelUpdate(channel.Id, firstMessage.Timestamp);
             }
         }
     }

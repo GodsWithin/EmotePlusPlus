@@ -9,7 +9,7 @@
 
         public override string ToString()
         {
-            return $"<{(Animated ? "a" : "")}:{Name}:{Id}> - {Uses}";
+            return $"<{(Animated ? "a" : "")}:{Name}:{Id}> {string.Format("{0:n0}", Uses)}";
         }
     }
 }

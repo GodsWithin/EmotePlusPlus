@@ -5,6 +5,7 @@ using LiteDB;
 using Microsoft.Extensions.DependencyInjection;
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Reflection;
 using System.Text;
 using System.Threading.Tasks;
@@ -49,7 +50,8 @@ namespace EmotePlusPlus.Services
 
             var context = new SocketCommandContext(_discord, message);
 
-            _database.Update(msg);
+            if (msg.Tags.Any())
+                _database.Update(msg.Tags, msg.Author.Id, msg.Channel.Id);
 
             int argPos = 0;
             if (!message.HasMentionPrefix(_discord.CurrentUser, ref argPos)

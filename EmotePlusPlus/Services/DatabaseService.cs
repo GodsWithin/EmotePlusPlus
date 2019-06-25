@@ -13,6 +13,7 @@ namespace EmotePlusPlus.Services
     {
         private readonly static string TABLE_EMOTES = "emotes";
         private readonly static string TABLE_USERS = "users";
+        private readonly static string TABLE_CHANNEL_UPDATES = "channel_updates";
 
         private readonly DiscordSocketClient _discord;
         private readonly LiteDatabase _database;
@@ -23,18 +24,18 @@ namespace EmotePlusPlus.Services
             _database = services.GetRequiredService<LiteDatabase>();
         }
 
-        public void Update(SocketMessage context)
+        public void Update(IReadOnlyCollection<ITag> tags, ulong userId, ulong channelId)
         {
-            var emojis = context.Tags.Where(x => x.Type == TagType.Emoji).Select(x => x.Value as Discord.Emote).ToList();
+            var emojis = tags.Where(x => x.Type == TagType.Emoji).Select(x => x.Value as Discord.Emote).ToList();
 
             if (emojis.Any())
             {
                 var emotes = _database.GetCollection<Models.Emote>(TABLE_EMOTES);
 
                 var userCollection = _database.GetCollection<User>(TABLE_USERS);
-                var user = userCollection.FindOne(x => x.Id == context.Author.Id) ?? new User
+                var user = userCollection.FindOne(x => x.Id == userId) ?? new User
                 {
-                    Id = context.Author.Id,
+                    Id = userId,
                     UsedEmotes = new List<EmoteData>()
                 };
 
@@ -56,11 +57,11 @@ namespace EmotePlusPlus.Services
                     emotes.Upsert(emote);
 
                     // Get the usage data of the used emote from the user
-                    EmoteData emoteData = user.UsedEmotes.FirstOrDefault(x => x.Id == emote.Id && x.ChannelId == context.Channel.Id) ?? new EmoteData
+                    EmoteData emoteData = user.UsedEmotes.FirstOrDefault(x => x.Id == emote.Id && x.ChannelId == channelId) ?? new EmoteData
                     {
                         Id = emote.Id,
                         Animated = emote.Animated,
-                        ChannelId = context.Channel.Id,
+                        ChannelId = channelId,
                         Name = emote.Name,
                         Uses = 0
                     };
@@ -92,7 +93,7 @@ namespace EmotePlusPlus.Services
                 })
                 .ToList();
         }
-        public List<EmoteQueryResult> GetTopAll(int number, ulong userId)
+        public List<EmoteQueryResult> GetTopUserAll(int number, ulong userId)
         {
             if (number <= 0) number = 10;
             if (number > 25) number = 25;
@@ -115,7 +116,26 @@ namespace EmotePlusPlus.Services
 
             return result;
         }
-        public List<EmoteQueryResult> GetTopAll(int number, ulong userId, ulong channelId)
+        public List<EmoteQueryResult> GetTopChannelAll(int number, ulong channelId)
+        {
+            if (number <= 0) number = 10;
+            if (number > 25) number = 25;
+
+            var users = _database.GetCollection<User>(TABLE_USERS).FindAll();
+
+            return users.SelectMany(x => x.UsedEmotes.Where(y => y.ChannelId == channelId))
+                .GroupBy(x => x.Id)
+                .Select(x => new EmoteQueryResult
+                {
+                    Id = x.First().Id,
+                    Animated = x.First().Animated,
+                    Name = x.First().Name,
+                    Uses = x.Sum(y => y.Uses)
+                })
+                .Take(number)
+                .ToList();
+        }
+        public List<EmoteQueryResult> GetTopUserChannelAll(int number, ulong userId, ulong channelId)
         {
             if (number <= 0) number = 10;
             if (number > 25) number = 25;
@@ -139,7 +159,7 @@ namespace EmotePlusPlus.Services
 
             return result;
         }
-
+        
         public List<EmoteQueryResult> GetTop(int number, bool animated)
         {
             if (number <= 0) number = 10;
@@ -203,6 +223,80 @@ namespace EmotePlusPlus.Services
                 .ToList();
 
             return result;
+        }
+
+        public EmoteQueryResult GetEmoteData(Discord.Emote emote)
+        {
+            return _database.GetCollection<Models.Emote>(TABLE_EMOTES)
+                .Find(x => x.Id == emote.Id)
+                .Select(x => new EmoteQueryResult
+                {
+                    Id = x.Id,
+                    Animated = x.Animated,
+                    Name = x.Name,
+                    Uses = x.Uses
+                })
+                .FirstOrDefault();
+        }
+        public EmoteQueryResult GetEmoteUserData(Discord.Emote emote, ulong userId)
+        {
+            var user = _database.GetCollection<User>(TABLE_USERS).FindOne(x => x.Id == userId);
+            if (user == null) return null;
+
+            return user.UsedEmotes
+                .Where(x => x.Id == emote.Id)
+                .GroupBy(x => x.Id)
+                .Select(emotes => new EmoteQueryResult
+                {
+                    Id = emotes.First().Id,
+                    Name = emotes.First().Name,
+                    Uses = emotes.Sum(x => x.Uses),
+                    Animated = emotes.First().Animated
+                })
+                .OrderByDescending(x => x.Uses)
+                .FirstOrDefault();
+        }
+        public EmoteQueryResult GetEmoteChannelData(Discord.Emote emote, ulong channelId)
+        {
+            var users = _database.GetCollection<User>(TABLE_USERS).FindAll();
+
+            return users.SelectMany(x => x.UsedEmotes.Where(y => y.Id == emote.Id && y.ChannelId == channelId))
+                .GroupBy(x => x.Id)
+                .Select(x => new EmoteQueryResult
+                {
+                    Id = x.First().Id,
+                    Animated = x.First().Animated,
+                    Name = x.First().Name,
+                    Uses = x.Sum(y => y.Uses)
+                })
+                .FirstOrDefault();
+        }
+
+        public DateTimeOffset LastChannelUpdate(ulong channelId)
+        {
+            var channelUpdateCollection = _database.GetCollection<ChannelUpdate>(TABLE_CHANNEL_UPDATES);
+            var channelUpdate = channelUpdateCollection.FindOne(x => x.ChannelId == channelId);
+
+            if (channelUpdate == null)
+            {
+                channelUpdate = new ChannelUpdate
+                {
+                    ChannelId = channelId,
+                    LastUpdate = DateTime.UnixEpoch
+                };
+
+                channelUpdateCollection.Insert(channelUpdate);
+            }
+
+            return channelUpdate.LastUpdate;
+        }
+
+        public void UpdateLastChannelUpdate(ulong channelId, DateTimeOffset offset)
+        {
+            var channelUpdateCollection = _database.GetCollection<ChannelUpdate>(TABLE_CHANNEL_UPDATES);
+            var channelUpdate = channelUpdateCollection.FindOne(x => x.ChannelId == channelId);
+            channelUpdate.LastUpdate = offset.UtcDateTime;
+            channelUpdateCollection.Update(channelUpdate);
         }
 
         public int EmoteCount()
