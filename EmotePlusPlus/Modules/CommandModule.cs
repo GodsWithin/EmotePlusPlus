@@ -341,50 +341,5 @@ namespace EmotePlusPlus.Modules
 
         #endregion
 
-        [Command("initialize", RunMode = RunMode.Async)]
-        [RequireUserPermission(GuildPermission.Administrator)]
-        public async Task GetHistory()
-        {
-            var channels = Context.Guild.Channels.Where(x => x.GetType() == typeof(SocketTextChannel));
-            foreach (var channel in channels)
-            {
-                Console.WriteLine(channel.Name);
-
-                var lastUpdate = DatabaseService.LastChannelUpdate(channel.Id);
-
-                var firstMessage = (await (channel as ISocketMessageChannel).GetMessagesAsync(1).FlattenAsync()).First();
-                if (firstMessage.Tags.Any() && firstMessage.Timestamp > lastUpdate)
-                    DatabaseService.Update(firstMessage.Tags, firstMessage.Author.Id, firstMessage.Channel.Id);
-
-                var lastMessage = firstMessage;
-                bool done = false;
-
-                while (!done)
-                {
-                    Console.Write(".");
-                    var messages = await (channel as ISocketMessageChannel).GetMessagesAsync(lastMessage, Direction.Before, 100, CacheMode.AllowDownload).FlattenAsync();
-                    foreach (var message in messages)
-                    {
-                        if (message.Tags.Any() && message.Timestamp > lastUpdate)
-                            DatabaseService.Update(message.Tags, message.Author.Id, message.Channel.Id);
-                    }
-
-                    if (!messages.Any())
-                    {
-                        done = true;
-                    }
-                    else
-                    {
-                        lastMessage = messages.Last();
-                        if (lastMessage.Timestamp < lastUpdate)
-                        {
-                            done = true;
-                        }
-                    }
-                }
-
-                DatabaseService.UpdateLastChannelUpdate(channel.Id, firstMessage.Timestamp);
-            }
-        }
     }
 }

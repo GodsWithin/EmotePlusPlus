@@ -50,8 +50,8 @@ namespace EmotePlusPlus.Services
 
             var context = new SocketCommandContext(_discord, message);
 
-            if (msg.Tags.Any())
-                _database.Update(msg.Tags, msg.Author.Id, msg.Channel.Id);
+            if (msg.Tags.Any() && _database.CanAcceptNewUpdates)
+                _database.Update(msg.Tags, msg.Author.Id, msg.Channel.Id, true, msg.Timestamp);
 
             int argPos = 0;
             if (!message.HasMentionPrefix(_discord.CurrentUser, ref argPos)

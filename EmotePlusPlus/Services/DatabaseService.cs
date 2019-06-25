@@ -6,11 +6,14 @@ using System.Linq;
 using Discord;
 using EmotePlusPlus.Models;
 using System.Collections.Generic;
+using System.Threading.Tasks;
 
 namespace EmotePlusPlus.Services
 {
     public class DatabaseService
     {
+        public bool CanAcceptNewUpdates { get; set; } = true;
+
         private readonly static string TABLE_EMOTES = "emotes";
         private readonly static string TABLE_USERS = "users";
         private readonly static string TABLE_CHANNEL_UPDATES = "channel_updates";
@@ -22,9 +25,61 @@ namespace EmotePlusPlus.Services
         {
             _discord = services.GetRequiredService<DiscordSocketClient>();
             _database = services.GetRequiredService<LiteDatabase>();
+
+            _discord.Ready += OnReady;
         }
 
-        public void Update(IReadOnlyCollection<ITag> tags, ulong userId, ulong channelId)
+        private async Task OnReady()
+        {
+            await _discord.SetGameAsync($"Scanning channels... beep boop");
+
+            CanAcceptNewUpdates = false;
+            var channels = _discord.Guilds.First().Channels.Where(x => x.GetType() == typeof(SocketTextChannel));
+
+            foreach (var channel in channels)
+            {
+                var lastUpdate = LastChannelUpdate(channel.Id);
+
+                var firstMessage = (await(channel as ISocketMessageChannel).GetMessagesAsync(1).FlattenAsync()).First();
+                if (firstMessage.Tags.Any() && firstMessage.Timestamp > lastUpdate)
+                    Update(firstMessage.Tags, firstMessage.Author.Id, firstMessage.Channel.Id, false, DateTimeOffset.UtcNow);
+
+                var lastMessage = firstMessage;
+                bool done = firstMessage.Timestamp <= lastUpdate;
+
+                while (!done)
+                {
+                    var messages = await(channel as ISocketMessageChannel).GetMessagesAsync(lastMessage, Direction.Before, 100, CacheMode.AllowDownload).FlattenAsync();
+                    foreach (var message in messages)
+                    {
+                        if (message.Tags.Any() && message.Timestamp > lastUpdate)
+                            Update(message.Tags, message.Author.Id, message.Channel.Id, false, DateTimeOffset.UtcNow);
+                    }
+
+                    if (!messages.Any())
+                    {
+                        done = true;
+                    }
+                    else
+                    {
+                        lastMessage = messages.Last();
+                        if (lastMessage.Timestamp < lastUpdate)
+                        {
+                            done = true;
+                        }
+                    }
+                }
+
+                UpdateLastChannelUpdate(channel.Id, firstMessage.Timestamp);
+            }
+            CanAcceptNewUpdates = true;
+
+            await _discord.SetGameAsync("emote catcher");
+
+            _discord.Ready -= OnReady;
+        }
+
+        public void Update(IReadOnlyCollection<ITag> tags, ulong userId, ulong channelId, bool updateChannelTimestamp, DateTimeOffset offset)
         {
             var emojis = tags.Where(x => x.Type == TagType.Emoji).Select(x => x.Value as Discord.Emote).ToList();
 
@@ -74,6 +129,25 @@ namespace EmotePlusPlus.Services
                     emoteData.Uses++;
                     userCollection.Upsert(user);
                 }
+
+                if (updateChannelTimestamp)
+                {
+                    var channelUpdateCollection = _database.GetCollection<ChannelUpdate>(TABLE_CHANNEL_UPDATES);
+                    var channelUpdate = channelUpdateCollection.FindOne(x => x.ChannelId == channelId);
+
+                    if (channelUpdate == null)
+                    {
+                        channelUpdate = new ChannelUpdate
+                        {
+                            ChannelId = channelId,
+                            LastUpdate = DateTime.UnixEpoch
+                        };
+                    }
+
+                    channelUpdate.LastUpdate = offset.UtcDateTime;
+                    channelUpdateCollection.Upsert(channelUpdate);
+                }
+
             }
         }
 
