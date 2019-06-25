@@ -34,6 +34,9 @@ namespace EmotePlusPlus.Modules
             if (emotes.Any())
             {
                 await ReplyAsync(string.Join("\n", emotes));
+            } else
+            {
+                await ReplyAsync("No emotes have been used on this server.");
             }
         }
 
@@ -46,6 +49,10 @@ namespace EmotePlusPlus.Modules
             {
                 await ReplyAsync(string.Join("\n", emotes));
             }
+            else
+            {
+                await ReplyAsync("No normal emotes have been used on this server.");
+            }
         }
 
         // 1 animated
@@ -56,6 +63,10 @@ namespace EmotePlusPlus.Modules
             if (emotes.Any())
             {
                 await ReplyAsync(string.Join("\n", emotes));
+            }
+            else
+            {
+                await ReplyAsync("No gif emotes have been used on this server.");
             }
         }
 
@@ -75,9 +86,15 @@ namespace EmotePlusPlus.Modules
         public async Task TopUserAll(IGuildUser user)
         {
             var emotes = DatabaseService.GetTopAll(10, user.Id);
-            if (emotes.Any())
+            try
             {
-                await ReplyAsync(string.Join("\n", emotes));
+                if (emotes.Any())
+                {
+                    await ReplyAsync(string.Join("\n", emotes));
+                }
+            } catch (ArgumentNullException ex)
+            {
+                await ReplyAsync("That user has used no emotes.");
             }
         }
 
@@ -86,9 +103,16 @@ namespace EmotePlusPlus.Modules
         public async Task TopUserNormal(int number, IGuildUser user)
         {
             var emotes = DatabaseService.GetTop(number, false, user.Id);
-            if (emotes.Any())
+            try
             {
-                await ReplyAsync(string.Join("\n", emotes));
+                if (emotes.Any())
+                {
+                    await ReplyAsync(string.Join("\n", emotes));
+                }
+            }
+            catch (ArgumentNullException ex)
+            {
+                await ReplyAsync("That user has used no normal emotes.");
             }
         }
 
@@ -97,9 +121,16 @@ namespace EmotePlusPlus.Modules
         public async Task TopUserNormal(IGuildUser user)
         {
             var emotes = DatabaseService.GetTop(10, false, user.Id);
-            if (emotes.Any())
+            try
             {
-                await ReplyAsync(string.Join("\n", emotes));
+                if (emotes.Any())
+                {
+                    await ReplyAsync(string.Join("\n", emotes));
+                }
+            }
+            catch (ArgumentNullException ex)
+            {
+                await ReplyAsync("That user has used no normal emotes.");
             }
         }
 
@@ -108,9 +139,16 @@ namespace EmotePlusPlus.Modules
         public async Task TopUserGif(int number, IGuildUser user)
         {
             var emotes = DatabaseService.GetTop(number, true, user.Id);
-            if (emotes.Any())
+            try
             {
-                await ReplyAsync(string.Join("\n", emotes));
+                if (emotes.Any())
+                {
+                    await ReplyAsync(string.Join("\n", emotes));
+                }
+            }
+            catch (ArgumentNullException ex)
+            {
+                await ReplyAsync("That user has used no gif emotes.");
             }
         }
 
@@ -119,9 +157,16 @@ namespace EmotePlusPlus.Modules
         public async Task TopUserGif(IGuildUser user)
         {
             var emotes = DatabaseService.GetTop(10, true, user.Id);
-            if (emotes.Any())
+            try
             {
-                await ReplyAsync(string.Join("\n", emotes));
+                if (emotes.Any())
+                {
+                    await ReplyAsync(string.Join("\n", emotes));
+                }
+            }
+            catch (ArgumentNullException ex)
+            {
+                await ReplyAsync("That user has used no gif emotes.");
             }
         }
 
@@ -130,9 +175,16 @@ namespace EmotePlusPlus.Modules
         public async Task TopUserChannel(int number, IGuildUser user, SocketTextChannel channel)
         {
             var emotes = DatabaseService.GetTopAll(number, user.Id, channel.Id);
-            if (emotes.Any())
+            try
             {
-                await ReplyAsync(string.Join("\n", emotes));
+                if (emotes.Any())
+                {
+                    await ReplyAsync(string.Join("\n", emotes));
+                }
+            }
+            catch (ArgumentNullException ex)
+            {
+                await ReplyAsync("That user has used no emotes in that channel.");
             }
         }
 
@@ -141,9 +193,16 @@ namespace EmotePlusPlus.Modules
         public async Task TopUserChannel(IGuildUser user, SocketTextChannel channel)
         {
             var emotes = DatabaseService.GetTopAll(10, user.Id, channel.Id);
-            if (emotes.Any())
+            try
             {
-                await ReplyAsync(string.Join("\n", emotes));
+                if (emotes.Any())
+                {
+                    await ReplyAsync(string.Join("\n", emotes));
+                }
+            }
+            catch (ArgumentNullException ex)
+            {
+                await ReplyAsync("That user has used no emotes in that channel.");
             }
         }
 
@@ -152,9 +211,16 @@ namespace EmotePlusPlus.Modules
         public async Task TopUserChannelNormal(int number, IGuildUser user, SocketTextChannel channel)
         {
             var emotes = DatabaseService.GetTop(number, false, user.Id, channel.Id);
-            if (emotes.Any())
+            try
             {
-                await ReplyAsync(string.Join("\n", emotes));
+                if (emotes.Any())
+                {
+                    await ReplyAsync(string.Join("\n", emotes));
+                }
+            }
+            catch (ArgumentNullException ex)
+            {
+                await ReplyAsync("That user has used no normal emotes in that channel.");
             }
         }
 
@@ -163,9 +229,16 @@ namespace EmotePlusPlus.Modules
         public async Task TopUserChannelNormal(IGuildUser user, SocketTextChannel channel)
         {
             var emotes = DatabaseService.GetTop(10, false, user.Id, channel.Id);
-            if (emotes.Any())
+            try
             {
-                await ReplyAsync(string.Join("\n", emotes));
+                if (emotes.Any())
+                {
+                    await ReplyAsync(string.Join("\n", emotes));
+                }
+            }
+            catch (ArgumentNullException ex)
+            {
+                await ReplyAsync("That user has used no normal emotes in that channel.");
             }
         }
 
@@ -174,9 +247,16 @@ namespace EmotePlusPlus.Modules
         public async Task TopUserChannelGif(int number, IGuildUser user, SocketTextChannel channel)
         {
             var emotes = DatabaseService.GetTop(number, true, user.Id, channel.Id);
-            if (emotes.Any())
+            try
             {
-                await ReplyAsync(string.Join("\n", emotes));
+                if (emotes.Any())
+                {
+                    await ReplyAsync(string.Join("\n", emotes));
+                }
+            }
+            catch (ArgumentNullException ex)
+            {
+                await ReplyAsync("That user has used no gif emotes in that channel.");
             }
         }
 
@@ -185,9 +265,16 @@ namespace EmotePlusPlus.Modules
         public async Task TopUserChannelGif(IGuildUser user, SocketTextChannel channel)
         {
             var emotes = DatabaseService.GetTop(10, true, user.Id, channel.Id);
-            if (emotes.Any())
+            try
             {
-                await ReplyAsync(string.Join("\n", emotes));
+                if (emotes.Any())
+                {
+                    await ReplyAsync(string.Join("\n", emotes));
+                }
+            }
+            catch (ArgumentNullException ex)
+            {
+                await ReplyAsync("That user has used no gif emotes in that channel.");
             }
         }
     }
