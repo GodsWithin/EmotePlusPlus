@@ -1,13 +1,10 @@
 ﻿using Discord;
 using Discord.Commands;
 using Discord.WebSocket;
-using LiteDB;
 using Microsoft.Extensions.DependencyInjection;
 using System;
-using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
-using System.Text;
 using System.Threading.Tasks;
 
 namespace EmotePlusPlus.Services
@@ -44,18 +41,20 @@ namespace EmotePlusPlus.Services
         public async Task MessageReceivedAsync(SocketMessage msg)
         {
             // Ignore system messages and messages from bots.
-            
+
             if (!(msg is SocketUserMessage message)) return;
             if (message.Source != MessageSource.User) return;
 
             var context = new SocketCommandContext(_discord, message);
 
-            if (msg.Tags.Any() && _database.CanAcceptNewUpdates)
-                _database.Update(msg.Tags, msg.Author.Id, msg.Channel.Id, true, msg.Timestamp);
-
             int argPos = 0;
             if (!message.HasMentionPrefix(_discord.CurrentUser, ref argPos)
-                && !message.HasCharPrefix('+', ref argPos)) return;
+                && !message.HasCharPrefix('+', ref argPos))
+            {
+                if (msg.Tags.Any() && _database.CanAcceptNewUpdates)
+                    _database.Update(msg.Tags, msg.Author.Id, msg.Channel.Id, msg.Timestamp, true, msg.Timestamp);
+                return;
+            }
 
             // Perform the execution of the command. In this method,
             // the command service will perform precondition and parsing check
@@ -76,7 +75,6 @@ namespace EmotePlusPlus.Services
                 return;
 
             // The command failed, let's notify the user that something happened.
-
             if (result.Error == CommandError.Exception)
                 await context.Channel.SendMessageAsync("Something broke!");
             else

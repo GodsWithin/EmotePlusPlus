@@ -14,8 +14,7 @@ namespace EmotePlusPlus.Services
     {
         public bool CanAcceptNewUpdates { get; set; } = true;
 
-        private readonly static string TABLE_EMOTES = "emotes";
-        private readonly static string TABLE_USERS = "users";
+        private readonly static string TABLE_EMOTE_USES = "emote_uses";
         private readonly static string TABLE_CHANNEL_UPDATES = "channel_updates";
 
         private readonly DiscordSocketClient _discord;
@@ -26,7 +25,7 @@ namespace EmotePlusPlus.Services
             _discord = services.GetRequiredService<DiscordSocketClient>();
             _database = services.GetRequiredService<LiteDatabase>();
 
-            _discord.Ready += OnReady;
+            //_discord.Ready += OnReady;
         }
 
         private async Task OnReady()
@@ -38,22 +37,23 @@ namespace EmotePlusPlus.Services
 
             foreach (var channel in channels)
             {
+                Console.WriteLine(channel.Name);
                 var lastUpdate = LastChannelUpdate(channel.Id);
-
-                var firstMessage = (await(channel as ISocketMessageChannel).GetMessagesAsync(1).FlattenAsync()).First();
-                if (firstMessage.Tags.Any() && firstMessage.Timestamp > lastUpdate)
-                    Update(firstMessage.Tags, firstMessage.Author.Id, firstMessage.Channel.Id, false, DateTimeOffset.UtcNow);
+                var firstMessage = (await (channel as ISocketMessageChannel).GetMessagesAsync(1).FlattenAsync()).First();
+                if (firstMessage.Tags.Any(x => x.Type == TagType.Emoji) && firstMessage.Timestamp > lastUpdate)
+                    Update(firstMessage.Tags, firstMessage.Author.Id, firstMessage.Channel.Id, firstMessage.Timestamp, false, DateTimeOffset.UtcNow);
 
                 var lastMessage = firstMessage;
                 bool done = firstMessage.Timestamp <= lastUpdate;
 
                 while (!done)
                 {
-                    var messages = await(channel as ISocketMessageChannel).GetMessagesAsync(lastMessage, Direction.Before, 100, CacheMode.AllowDownload).FlattenAsync();
+                    Console.Write(".");
+                    var messages = await (channel as ISocketMessageChannel).GetMessagesAsync(lastMessage, Direction.Before, 100, CacheMode.AllowDownload).FlattenAsync();
                     foreach (var message in messages)
                     {
-                        if (message.Tags.Any() && message.Timestamp > lastUpdate)
-                            Update(message.Tags, message.Author.Id, message.Channel.Id, false, DateTimeOffset.UtcNow);
+                        if (message.Tags.Any(x => x.Type == TagType.Emoji) && message.Timestamp > lastUpdate)
+                            Update(message.Tags, message.Author.Id, message.Channel.Id, message.Timestamp, false, DateTimeOffset.UtcNow);
                     }
 
                     if (!messages.Any())
@@ -72,6 +72,7 @@ namespace EmotePlusPlus.Services
 
                 UpdateLastChannelUpdate(channel.Id, firstMessage.Timestamp);
             }
+
             CanAcceptNewUpdates = true;
 
             await _discord.SetGameAsync("emote catcher");
@@ -79,55 +80,30 @@ namespace EmotePlusPlus.Services
             _discord.Ready -= OnReady;
         }
 
-        public void Update(IReadOnlyCollection<ITag> tags, ulong userId, ulong channelId, bool updateChannelTimestamp, DateTimeOffset offset)
+        public void Update(IReadOnlyCollection<ITag> tags, ulong userId, ulong channelId, DateTimeOffset messageTime, bool updateChannelTimestamp, DateTimeOffset offset)
         {
-            var emojis = tags.Where(x => x.Type == TagType.Emoji).Select(x => x.Value as Discord.Emote).ToList();
+            var emojis = tags.Where(x => x.Type == TagType.Emoji).Select(x => x.Value as Emote).ToList();
 
             if (emojis.Any())
             {
-                var emotes = _database.GetCollection<Models.Emote>(TABLE_EMOTES);
-
-                var userCollection = _database.GetCollection<User>(TABLE_USERS);
-                var user = userCollection.FindOne(x => x.Id == userId) ?? new User
-                {
-                    Id = userId,
-                    UsedEmotes = new List<EmoteData>()
-                };
+                var emoteUses = _database.GetCollection<EmoteUse>(TABLE_EMOTE_USES);
 
                 // Check if emoji is already present in the database, if not
                 // add it.
                 foreach (var emoji in emojis)
                 {
                     // Get the emote from the database whose data has to be updated            
-                    var emote = emotes.FindOne(e => e.Id == emoji.Id) ?? new Models.Emote
+                    EmoteUse emoteUse = new EmoteUse
                     {
-                        Id = emoji.Id,
-                        Name = emoji.Name,
-                        CreatedAt = emoji.CreatedAt.DateTime,
-                        Uses = 0,
-                        Animated = emoji.Animated
-                    };
-
-                    emote.Uses++;
-                    emotes.Upsert(emote);
-
-                    // Get the usage data of the used emote from the user
-                    EmoteData emoteData = user.UsedEmotes.FirstOrDefault(x => x.Id == emote.Id && x.ChannelId == channelId) ?? new EmoteData
-                    {
-                        Id = emote.Id,
-                        Animated = emote.Animated,
+                        EmoteId = emoji.Id,
+                        EmoteName = emoji.Name,
+                        Animated = emoji.Animated,
                         ChannelId = channelId,
-                        Name = emote.Name,
-                        Uses = 0
+                        UserId = userId,
+                        Timestamp = messageTime.UtcDateTime
                     };
 
-                    if (emoteData.Uses == 0)
-                    {
-                        user.UsedEmotes.Add(emoteData);
-                    }
-
-                    emoteData.Uses++;
-                    userCollection.Upsert(user);
+                    emoteUses.Insert(emoteUse);
                 }
 
                 if (updateChannelTimestamp)
@@ -151,197 +127,244 @@ namespace EmotePlusPlus.Services
             }
         }
 
-        public List<EmoteQueryResult> GetTopAll(int number)
+        public List<EmoteQueryResult> GetTopAll()
         {
-            if (number <= 0) number = 10;
-            if (number > 25) number = 25;
-            return _database.GetCollection<Models.Emote>(TABLE_EMOTES)
+            return _database.GetCollection<EmoteUse>(TABLE_EMOTE_USES)
                 .FindAll()
-                .OrderByDescending(emote => emote.Uses)
-                .Take(number)
-                .Select(emote => new EmoteQueryResult
+                .GroupBy(emoteUse => emoteUse.EmoteId)
+                .Select(emoteUses => new EmoteQueryResult
                 {
-                    Id = emote.Id,
-                    Name = emote.Name,
-                    Uses = emote.Uses
+                    Id = emoteUses.First().EmoteId,
+                    Animated = emoteUses.First().Animated,
+                    Name = emoteUses.First().EmoteName,
+                    Uses = emoteUses.Sum(x => 1)
                 })
+                .OrderByDescending(result => result.Uses)
                 .ToList();
         }
-        public List<EmoteQueryResult> GetTopUserAll(int number, ulong userId)
+        public List<EmoteQueryResult> GetTopPeriodAll(DateTime period)
         {
-            if (number <= 0) number = 10;
-            if (number > 25) number = 25;
-
-            var user = _database.GetCollection<User>(TABLE_USERS).FindOne(x => x.Id == userId);
-            if (user == null) return null;
-
-            var result = user.UsedEmotes
-                .GroupBy(emote => emote.Id)
-                .Select(emotes => new EmoteQueryResult
+            return _database.GetCollection<EmoteUse>(TABLE_EMOTE_USES)
+                .FindAll()
+                .Where(emoteUse => emoteUse.Timestamp.Year == period.Year && emoteUse.Timestamp.Month == period.Month)
+                .GroupBy(emoteUse => emoteUse.EmoteId)
+                .Select(emoteUses => new EmoteQueryResult
                 {
-                    Id = emotes.First().Id,
-                    Name = emotes.First().Name,
-                    Uses = emotes.Sum(emote => emote.Uses),
-                    Animated = emotes.First().Animated
+                    Id = emoteUses.First().EmoteId,
+                    Animated = emoteUses.First().Animated,
+                    Name = emoteUses.First().EmoteName,
+                    Uses = emoteUses.Sum(x => 1)
                 })
-                .OrderByDescending(emote => emote.Uses)
-                .Take(number)
-                .ToList();
-
-            return result;
-        }
-        public List<EmoteQueryResult> GetTopChannelAll(int number, ulong channelId)
-        {
-            if (number <= 0) number = 10;
-            if (number > 25) number = 25;
-
-            var users = _database.GetCollection<User>(TABLE_USERS).FindAll();
-
-            return users.SelectMany(x => x.UsedEmotes.Where(y => y.ChannelId == channelId))
-                .GroupBy(x => x.Id)
-                .Select(x => new EmoteQueryResult
-                {
-                    Id = x.First().Id,
-                    Animated = x.First().Animated,
-                    Name = x.First().Name,
-                    Uses = x.Sum(y => y.Uses)
-                })
-                .Take(number)
+                .OrderByDescending(result => result.Uses)
                 .ToList();
         }
-        public List<EmoteQueryResult> GetTopUserChannelAll(int number, ulong userId, ulong channelId)
+        public List<EmoteQueryResult> GetTopUserAll(ulong userId)
         {
-            if (number <= 0) number = 10;
-            if (number > 25) number = 25;
-
-            var user = _database.GetCollection<User>(TABLE_USERS).FindOne(x => x.Id == userId);
-            if (user == null) return null;
-
-            var result = user.UsedEmotes
-                .Where(emote => emote.ChannelId == channelId)
-                .GroupBy(emote => emote.Id)
-                .Select(emotes => new EmoteQueryResult
-                {
-                    Id = emotes.First().Id,
-                    Name = emotes.First().Name,
-                    Uses = emotes.Sum(emote => emote.Uses),
-                    Animated = emotes.First().Animated
-                })
-                .OrderByDescending(emote => emote.Uses)
-                .Take(number)
-                .ToList();
-
-            return result;
+            return _database.GetCollection<EmoteUse>(TABLE_EMOTE_USES)
+               .Find(emoteUse => emoteUse.UserId == userId)
+               .GroupBy(emoteUse => emoteUse.EmoteId)
+               .Select(emoteUses => new EmoteQueryResult
+               {
+                   Id = emoteUses.First().EmoteId,
+                   Animated = emoteUses.First().Animated,
+                   Name = emoteUses.First().EmoteName,
+                   Uses = emoteUses.Sum(x => 1)
+               })
+               .OrderByDescending(result => result.Uses)
+               .ToList();
         }
-        
-        public List<EmoteQueryResult> GetTop(int number, bool animated)
+        public List<EmoteQueryResult> GetTopChannelAll(ulong channelId)
         {
-            if (number <= 0) number = 10;
-            if (number > 25) number = 25;
-            return _database.GetCollection<Models.Emote>(TABLE_EMOTES)
-                .Find(emote => emote.Animated == animated)
-                .OrderByDescending(emote => emote.Uses)
-                .Take(number)
-                .Select(emote => new EmoteQueryResult
-                {
-                    Id = emote.Id,
-                    Name = emote.Name,
-                    Uses = emote.Uses
-                })
-                .ToList();
+            return _database.GetCollection<EmoteUse>(TABLE_EMOTE_USES)
+               .Find(emoteUse => emoteUse.ChannelId == channelId)
+               .GroupBy(emoteUse => emoteUse.EmoteId)
+               .Select(emoteUses => new EmoteQueryResult
+               {
+                   Id = emoteUses.First().EmoteId,
+                   Animated = emoteUses.First().Animated,
+                   Name = emoteUses.First().EmoteName,
+                   Uses = emoteUses.Sum(x => 1)
+               })
+               .OrderByDescending(result => result.Uses)
+               .ToList();
         }
-        public List<EmoteQueryResult> GetTop(int number, bool animated, ulong userId)
+        public List<EmoteQueryResult> GetTopUserChannelAll(ulong userId, ulong channelId)
         {
-            if (number <= 0) number = 10;
-            if (number > 25) number = 25;
-
-            var user = _database.GetCollection<User>(TABLE_USERS).FindOne(x => x.Id == userId);
-            if (user == null) return null;
-
-            var result = user.UsedEmotes
-                .Where(emote => emote.Animated == animated)
-                .GroupBy(emote => emote.Id)
-                .Select(emotes => new EmoteQueryResult
-                {
-                    Id = emotes.First().Id,
-                    Name = emotes.First().Name,
-                    Uses = emotes.Sum(emote => emote.Uses),
-                    Animated = emotes.First().Animated
-                })
-                .OrderByDescending(emote => emote.Uses)
-                .Take(number)
-                .ToList();
-
-            return result;
-        }
-        public List<EmoteQueryResult> GetTop(int number, bool animated, ulong userId, ulong channelId)
-        {
-            if (number <= 0) number = 10;
-            if (number > 25) number = 25;
-
-            var user = _database.GetCollection<User>(TABLE_USERS).FindOne(x => x.Id == userId);
-            if (user == null) return null;
-
-            var result = user.UsedEmotes
-                .Where(emote => emote.Animated == animated && emote.ChannelId == channelId)
-                .GroupBy(emote => emote.Id)
-                .Select(emotes => new EmoteQueryResult
-                {
-                    Id = emotes.First().Id,
-                    Name = emotes.First().Name,
-                    Uses = emotes.Sum(emote => emote.Uses),
-                    Animated = emotes.First().Animated
-                })
-                .OrderByDescending(emote => emote.Uses)
-                .Take(number)
-                .ToList();
-
-            return result;
+            return _database.GetCollection<EmoteUse>(TABLE_EMOTE_USES)
+               .Find(emoteUse => emoteUse.ChannelId == channelId && emoteUse.UserId == userId)
+               .GroupBy(emoteUse => emoteUse.EmoteId)
+               .Select(emoteUses => new EmoteQueryResult
+               {
+                   Id = emoteUses.First().EmoteId,
+                   Animated = emoteUses.First().Animated,
+                   Name = emoteUses.First().EmoteName,
+                   Uses = emoteUses.Sum(x => 1)
+               })
+               .OrderByDescending(result => result.Uses)
+               .ToList();
         }
 
-        public EmoteQueryResult GetEmoteData(Discord.Emote emote)
+        public List<EmoteQueryResult> GetTop(bool animated)
         {
-            return _database.GetCollection<Models.Emote>(TABLE_EMOTES)
-                .Find(x => x.Id == emote.Id)
-                .Select(x => new EmoteQueryResult
+            return _database.GetCollection<EmoteUse>(TABLE_EMOTE_USES)
+                .Find(emoteUse => emoteUse.Animated == animated)
+                .GroupBy(emoteUse => emoteUse.EmoteId)
+                .Select(emoteUses => new EmoteQueryResult
                 {
-                    Id = x.Id,
-                    Animated = x.Animated,
-                    Name = x.Name,
-                    Uses = x.Uses
+                    Id = emoteUses.First().EmoteId,
+                    Animated = emoteUses.First().Animated,
+                    Name = emoteUses.First().EmoteName,
+                    Uses = emoteUses.Sum(x => 1)
+                })
+                .OrderByDescending(result => result.Uses)
+                .ToList();
+        }
+        public List<EmoteQueryResult> GetTopPeriod(bool animated, DateTime period)
+        {
+            return _database.GetCollection<EmoteUse>(TABLE_EMOTE_USES)
+                .Find(emoteUse => emoteUse.Animated == animated)
+                .Where(emoteUse => emoteUse.Timestamp.Year == period.Year && emoteUse.Timestamp.Month == period.Month)
+                .GroupBy(emoteUse => emoteUse.EmoteId)
+                .Select(emoteUses => new EmoteQueryResult
+                {
+                    Id = emoteUses.First().EmoteId,
+                    Animated = emoteUses.First().Animated,
+                    Name = emoteUses.First().EmoteName,
+                    Uses = emoteUses.Sum(x => 1)
+                })
+                .OrderByDescending(result => result.Uses)
+                .ToList();
+        }
+        public List<EmoteQueryResult> GetTopUser(bool animated, ulong userId)
+        {
+            return _database.GetCollection<EmoteUse>(TABLE_EMOTE_USES)
+                .Find(emoteUse => emoteUse.Animated == animated && emoteUse.UserId == userId)
+                .GroupBy(emoteUse => emoteUse.EmoteId)
+                .Select(emoteUses => new EmoteQueryResult
+                {
+                    Id = emoteUses.First().EmoteId,
+                    Animated = emoteUses.First().Animated,
+                    Name = emoteUses.First().EmoteName,
+                    Uses = emoteUses.Sum(x => 1)
+                })
+                .OrderByDescending(result => result.Uses)
+                .ToList();
+        }
+        public List<EmoteQueryResult> GetTopUserChannel(bool animated, ulong userId, ulong channelId)
+        {
+            return _database.GetCollection<EmoteUse>(TABLE_EMOTE_USES)
+                .Find(emoteUse => emoteUse.Animated == animated && emoteUse.UserId == userId && emoteUse.ChannelId == channelId)
+                .GroupBy(emoteUse => emoteUse.EmoteId)
+                .Select(emoteUses => new EmoteQueryResult
+                {
+                    Id = emoteUses.First().EmoteId,
+                    Animated = emoteUses.First().Animated,
+                    Name = emoteUses.First().EmoteName,
+                    Uses = emoteUses.Sum(x => 1)
+                })
+                .OrderByDescending(result => result.Uses)
+                .ToList();
+        }
+
+        public EmoteQueryResult GetEmoteData(Emote emote)
+        {
+            return _database.GetCollection<EmoteUse>(TABLE_EMOTE_USES)
+                .Find(emoteUse => emoteUse.EmoteId == emote.Id)
+                .GroupBy(emoteUse => emoteUse.EmoteId)
+                .Select(emoteUses => new EmoteQueryResult
+                {
+                    Id = emoteUses.First().EmoteId,
+                    Animated = emoteUses.First().Animated,
+                    Name = emoteUses.First().EmoteName,
+                    Uses = emoteUses.Sum(y => 1)
                 })
                 .FirstOrDefault();
         }
-        public EmoteQueryResult GetEmoteUserData(Discord.Emote emote, ulong userId)
+        public EmoteQueryResult GetEmoteUserData(Emote emote, ulong userId)
         {
-            var user = _database.GetCollection<User>(TABLE_USERS).FindOne(x => x.Id == userId);
-            if (user == null) return null;
-
-            return user.UsedEmotes
-                .Where(x => x.Id == emote.Id)
-                .GroupBy(x => x.Id)
-                .Select(emotes => new EmoteQueryResult
+            return _database.GetCollection<EmoteUse>(TABLE_EMOTE_USES)
+                .Find(emoteUse => emoteUse.EmoteId == emote.Id && emoteUse.UserId == userId)
+                .GroupBy(emoteUse => emoteUse.EmoteId)
+                .Select(emoteUses => new EmoteQueryResult
                 {
-                    Id = emotes.First().Id,
-                    Name = emotes.First().Name,
-                    Uses = emotes.Sum(x => x.Uses),
-                    Animated = emotes.First().Animated
+                    Id = emoteUses.First().EmoteId,
+                    Animated = emoteUses.First().Animated,
+                    Name = emoteUses.First().EmoteName,
+                    Uses = emoteUses.Sum(y => 1)
                 })
-                .OrderByDescending(x => x.Uses)
                 .FirstOrDefault();
         }
-        public EmoteQueryResult GetEmoteChannelData(Discord.Emote emote, ulong channelId)
+        public EmoteQueryResult GetEmoteChannelData(Emote emote, ulong channelId)
         {
-            var users = _database.GetCollection<User>(TABLE_USERS).FindAll();
-
-            return users.SelectMany(x => x.UsedEmotes.Where(y => y.Id == emote.Id && y.ChannelId == channelId))
-                .GroupBy(x => x.Id)
-                .Select(x => new EmoteQueryResult
+            return _database.GetCollection<EmoteUse>(TABLE_EMOTE_USES)
+                .Find(emoteUse => emoteUse.EmoteId == emote.Id && emoteUse.ChannelId == channelId)
+                .GroupBy(emoteUse => emoteUse.EmoteId)
+                .Select(emoteUses => new EmoteQueryResult
                 {
-                    Id = x.First().Id,
-                    Animated = x.First().Animated,
-                    Name = x.First().Name,
-                    Uses = x.Sum(y => y.Uses)
+                    Id = emoteUses.First().EmoteId,
+                    Animated = emoteUses.First().Animated,
+                    Name = emoteUses.First().EmoteName,
+                    Uses = emoteUses.Sum(y => 1)
+                })
+                .FirstOrDefault();
+        }
+        public EmoteQueryResult GetEmotePeriodData(Emote emote, DateTime period)
+        {
+            return _database.GetCollection<EmoteUse>(TABLE_EMOTE_USES)
+                .Find(emoteUse => emoteUse.EmoteId == emote.Id)
+                .Where(emoteUse => emoteUse.Timestamp.Year == period.Year && emoteUse.Timestamp.Month == period.Month)
+                .GroupBy(emoteUse => emoteUse.EmoteId)
+                .Select(emoteUses => new EmoteQueryResult
+                {
+                    Id = emoteUses.First().EmoteId,
+                    Animated = emoteUses.First().Animated,
+                    Name = emoteUses.First().EmoteName,
+                    Uses = emoteUses.Sum(y => 1)
+                })
+                .FirstOrDefault();
+        }
+        public EmoteQueryResult GetEmotePeriodUserData(Emote emote, ulong userId, DateTime period)
+        {
+            return _database.GetCollection<EmoteUse>(TABLE_EMOTE_USES)
+                .Find(emoteUse => emoteUse.EmoteId == emote.Id && emoteUse.UserId == userId)
+                .Where(emoteUse => emoteUse.Timestamp.Year == period.Year && emoteUse.Timestamp.Month == period.Month)
+                .GroupBy(emoteUse => emoteUse.EmoteId)
+                .Select(emoteUses => new EmoteQueryResult
+                {
+                    Id = emoteUses.First().EmoteId,
+                    Animated = emoteUses.First().Animated,
+                    Name = emoteUses.First().EmoteName,
+                    Uses = emoteUses.Sum(y => 1)
+                })
+                .FirstOrDefault();
+        }
+        public EmoteQueryResult GetEmotePeriodChannelData(Emote emote, ulong channelId, DateTime period)
+        {
+            return _database.GetCollection<EmoteUse>(TABLE_EMOTE_USES)
+                .Find(emoteUse => emoteUse.EmoteId == emote.Id && emoteUse.ChannelId == channelId)
+                .Where(emoteUse => emoteUse.Timestamp.Year == period.Year && emoteUse.Timestamp.Month == period.Month)
+                .GroupBy(emoteUse => emoteUse.EmoteId)
+                .Select(emoteUses => new EmoteQueryResult
+                {
+                    Id = emoteUses.First().EmoteId,
+                    Animated = emoteUses.First().Animated,
+                    Name = emoteUses.First().EmoteName,
+                    Uses = emoteUses.Sum(y => 1)
+                })
+                .FirstOrDefault();
+        }
+        public EmoteQueryResult GetEmotePeriodUserChannelData(Emote emote, ulong userId, ulong channelId, DateTime period)
+        {
+            return _database.GetCollection<EmoteUse>(TABLE_EMOTE_USES)
+                .Find(emoteUse => emoteUse.EmoteId == emote.Id && emoteUse.UserId == userId && emoteUse.ChannelId == channelId)
+                .Where(emoteUse => emoteUse.Timestamp.Year == period.Year && emoteUse.Timestamp.Month == period.Month)
+                .GroupBy(emoteUse => emoteUse.EmoteId)
+                .Select(emoteUses => new EmoteQueryResult
+                {
+                    Id = emoteUses.First().EmoteId,
+                    Animated = emoteUses.First().Animated,
+                    Name = emoteUses.First().EmoteName,
+                    Uses = emoteUses.Sum(y => 1)
                 })
                 .FirstOrDefault();
         }
@@ -364,18 +387,12 @@ namespace EmotePlusPlus.Services
 
             return channelUpdate.LastUpdate;
         }
-
         public void UpdateLastChannelUpdate(ulong channelId, DateTimeOffset offset)
         {
             var channelUpdateCollection = _database.GetCollection<ChannelUpdate>(TABLE_CHANNEL_UPDATES);
             var channelUpdate = channelUpdateCollection.FindOne(x => x.ChannelId == channelId);
             channelUpdate.LastUpdate = offset.UtcDateTime;
             channelUpdateCollection.Update(channelUpdate);
-        }
-
-        public int EmoteCount()
-        {
-            return _database.GetCollection<Models.Emote>(TABLE_EMOTES).FindAll().Count();
         }
     }
 }
