@@ -15,7 +15,7 @@ namespace EmotePlusPlus.Modules
 
         #region Server wide commands
 
-        [Command("top")]
+        [Command("top", RunMode = RunMode.Async)]
         public async Task TopAll()
         {
             var emotes = DatabaseService.GetTopAll();
@@ -33,7 +33,7 @@ namespace EmotePlusPlus.Modules
             }
         }
 
-        [Command("top")]
+        [Command("top", RunMode = RunMode.Async)]
         public async Task TopAllPeriod([Remainder] string date)
         {
             bool dateParsed = DateTime.TryParseExact(date, "MMMM yyyy", CultureInfo.InvariantCulture, DateTimeStyles.None, out DateTime period);
@@ -55,7 +55,7 @@ namespace EmotePlusPlus.Modules
             }
         }
 
-        [Command("topnormal")]
+        [Command("topnormal", RunMode = RunMode.Async)]
         public async Task TopNormal()
         {
             var emotes = DatabaseService.GetTop(false);
@@ -73,7 +73,7 @@ namespace EmotePlusPlus.Modules
             }
         }
 
-        [Command("topnormal")]
+        [Command("topnormal", RunMode = RunMode.Async)]
         public async Task TopNormalPeriod([Remainder] string date)
         {
             bool dateParsed = DateTime.TryParseExact(date, "MMMM yyyy", CultureInfo.InvariantCulture, DateTimeStyles.None, out DateTime period);
@@ -96,7 +96,7 @@ namespace EmotePlusPlus.Modules
             }
         }
 
-        [Command("topgif")]
+        [Command("topgif", RunMode = RunMode.Async)]
         public async Task TopGif()
         {
             var emotes = DatabaseService.GetTop(true);
@@ -114,7 +114,7 @@ namespace EmotePlusPlus.Modules
             }
         }
 
-        [Command("topgif")]
+        [Command("topgif", RunMode = RunMode.Async)]
         public async Task TopGifPeriod([Remainder] string date)
         {
             bool dateParsed = DateTime.TryParseExact(date, "MMMM yyyy", CultureInfo.InvariantCulture, DateTimeStyles.None, out DateTime period);
@@ -140,7 +140,7 @@ namespace EmotePlusPlus.Modules
         #endregion
 
         #region User specific commands
-        [Command("top")]
+        [Command("top", RunMode = RunMode.Async)]
         public async Task TopUserAll(IGuildUser user)
         {
             var emotes = DatabaseService.GetTopUserAll(user.Id);
@@ -154,7 +154,7 @@ namespace EmotePlusPlus.Modules
             }
         }
 
-        [Command("topnormal")]
+        [Command("topnormal", RunMode = RunMode.Async)]
         public async Task TopUserNormal(IGuildUser user)
         {
             var emotes = DatabaseService.GetTopUser(false, user.Id);
@@ -175,7 +175,7 @@ namespace EmotePlusPlus.Modules
             }
         }
 
-        [Command("topgif")]
+        [Command("topgif", RunMode = RunMode.Async)]
         public async Task TopUserGif(IGuildUser user)
         {
             var emotes = DatabaseService.GetTopUser(true, user.Id);
@@ -200,7 +200,7 @@ namespace EmotePlusPlus.Modules
 
         #region Channel specific commands
 
-        [Command("top")]
+        [Command("top", RunMode = RunMode.Async)]
         public async Task TopChannelAll(SocketTextChannel channel)
         {
             var emotes = DatabaseService.GetTopChannelAll(channel.Id);
@@ -218,7 +218,7 @@ namespace EmotePlusPlus.Modules
             }
         }
 
-        [Command("top")]
+        [Command("top", RunMode = RunMode.Async)]
         public async Task TopChannelPeriodAll(SocketTextChannel channel, [Remainder] string date)
         {
             bool dateParsed = DateTime.TryParseExact(date, "MMMM yyyy", CultureInfo.InvariantCulture, DateTimeStyles.None, out DateTime period);
@@ -245,7 +245,7 @@ namespace EmotePlusPlus.Modules
 
         #region User and channel specific commands
 
-        [Command("top")]
+        [Command("top", RunMode = RunMode.Async)]
         public async Task TopUserChannelAll(IGuildUser user, SocketTextChannel channel)
         {
             var emotes = DatabaseService.GetTopUserChannelAll(user.Id, channel.Id);
@@ -266,7 +266,7 @@ namespace EmotePlusPlus.Modules
             }
         }
 
-        [Command("topnormal")]
+        [Command("topnormal", RunMode = RunMode.Async)]
         public async Task TopUserChannelNormal(IGuildUser user, SocketTextChannel channel)
         {
             var emotes = DatabaseService.GetTopUserChannel(false, user.Id, channel.Id);
@@ -287,7 +287,7 @@ namespace EmotePlusPlus.Modules
             }
         }
 
-        [Command("topgif")]
+        [Command("topgif", RunMode = RunMode.Async)]
         public async Task TopUserChannelGif(IGuildUser user, SocketTextChannel channel)
         {
             var emotes = DatabaseService.GetTopUserChannel(true, user.Id, channel.Id);
@@ -312,7 +312,7 @@ namespace EmotePlusPlus.Modules
 
         #region Emote specific commands
 
-        [Command("check")]
+        [Command("check", RunMode = RunMode.Async)]
         public async Task CheckEmote(string emoteString)
         {
             bool success = Emote.TryParse(emoteString, out Emote emote);
@@ -326,7 +326,7 @@ namespace EmotePlusPlus.Modules
             }
         }
 
-        [Command("check")]
+        [Command("check", RunMode = RunMode.Async)]
         public async Task CheckEmoteUser(string emoteString, IGuildUser user)
         {
             bool success = Emote.TryParse(emoteString, out Emote emote);
@@ -340,7 +340,7 @@ namespace EmotePlusPlus.Modules
             }
         }
 
-        [Command("check")]
+        [Command("check", RunMode = RunMode.Async)]
         public async Task CheckEmoteChannel(string emoteString, SocketTextChannel channel)
         {
             bool success = Emote.TryParse(emoteString, out Emote emote);
@@ -354,7 +354,7 @@ namespace EmotePlusPlus.Modules
             }
         }
 
-        [Command("check")]
+        [Command("check", RunMode = RunMode.Async)]
         public async Task CheckEmoteDate(string emoteString, [Remainder] string date)
         {
             bool success = Emote.TryParse(emoteString, out Emote emote);
@@ -369,7 +369,7 @@ namespace EmotePlusPlus.Modules
             }
         }
 
-        [Command("check")]
+        [Command("check", RunMode = RunMode.Async)]
         public async Task CheckEmoteDateChannel(string emoteString, IGuildUser user, [Remainder] string date)
         {
             bool success = Emote.TryParse(emoteString, out Emote emote);
@@ -384,7 +384,7 @@ namespace EmotePlusPlus.Modules
             }
         }
 
-        [Command("check")]
+        [Command("check", RunMode = RunMode.Async)]
         public async Task CheckEmoteDateChannel(string emoteString, SocketTextChannel channel, [Remainder] string date)
         {
             bool success = Emote.TryParse(emoteString, out Emote emote);
@@ -399,7 +399,7 @@ namespace EmotePlusPlus.Modules
             }
         }
 
-        [Command("check")]
+        [Command("check", RunMode = RunMode.Async)]
         public async Task CheckEmoteDateUserChannel(string emoteString, IGuildUser user, SocketTextChannel channel)
         {
             bool success = Emote.TryParse(emoteString, out Emote emote);
@@ -413,7 +413,7 @@ namespace EmotePlusPlus.Modules
             }
         }
 
-        [Command("check")]
+        [Command("check", RunMode = RunMode.Async)]
         public async Task CheckEmoteDateUserChannel(string emoteString, IGuildUser user, SocketTextChannel channel, [Remainder] string date)
         {
             bool success = Emote.TryParse(emoteString, out Emote emote);

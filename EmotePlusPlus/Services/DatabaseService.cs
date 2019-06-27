@@ -13,6 +13,23 @@ namespace EmotePlusPlus.Services
     public class DatabaseService
     {
         public bool CanAcceptNewUpdates { get; set; } = true;
+        public ulong[] ChannelIds { get; set; } = {
+            138194444645040128, //general
+            168088911812362240, //fancy-you
+            282688771508404225, //lane2
+            198809450834952193, // games
+            569901491733921793, //twicelights
+            138195009580171264, //tzuyu
+            138195029607841792, //nayeon
+            138194941263216640, //jihyo
+            138194483492683777, //dahyun
+            138194636593168384, //chaeyoung
+            138194610101944320, //jeongyeon
+            138194569698344960, //momo
+            138194552837111808, //mina
+            138195097484263424, //sana
+            159936670026825728  //botney
+        };
 
         private readonly static string TABLE_EMOTE_USES = "emote_uses";
         private readonly static string TABLE_CHANNEL_UPDATES = "channel_updates";
@@ -33,14 +50,10 @@ namespace EmotePlusPlus.Services
         private async Task OnReady()
         {
             twiceCord = _discord.Guilds.FirstOrDefault(x => x.Id == 138194444645040128);
-            GuildEmote t = twiceCord.Emotes.First();
-
-            await _discord.SetGameAsync($"Scanning channels... beep boop");
-
+            
             CanAcceptNewUpdates = false;
 
-            var channels = twiceCord.Channels.Where(x => x.GetType() == typeof(SocketTextChannel));
-            channels = channels.Where(x => x.Id == 464543226347520000);
+            var channels = twiceCord.Channels.Where(x => x.GetType() == typeof(SocketTextChannel) && ChannelIds.Contains(x.Id));
 
             foreach (var channel in channels)
             {
@@ -81,9 +94,7 @@ namespace EmotePlusPlus.Services
             }
 
             CanAcceptNewUpdates = true;
-
-            await _discord.SetGameAsync("emote catcher");
-
+            
             _discord.Ready -= OnReady;
         }
 

@@ -51,7 +51,7 @@ namespace EmotePlusPlus.Services
             if (!message.HasMentionPrefix(_discord.CurrentUser, ref argPos)
                 && !message.HasCharPrefix('+', ref argPos))
             {
-                if (msg.Tags.Any() && _database.CanAcceptNewUpdates)
+                if (msg.Tags.Any() && _database.CanAcceptNewUpdates && _database.ChannelIds.Contains(msg.Channel.Id))
                     _database.Update(msg.Tags, msg.Author.Id, msg.Channel.Id, msg.Timestamp, true, msg.Timestamp);
                 return;
             }
