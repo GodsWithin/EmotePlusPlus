@@ -12,7 +12,7 @@ namespace EmotePlusPlus.Services
 {
     public class DatabaseService
     {
-        public bool CanAcceptNewUpdates { get; set; } = true;
+        public bool CanAcceptNewUpdates { get; set; } = false;
         public ulong[] ChannelIds { get; set; } = {
             138194444645040128, //general
             168088911812362240, //fancy-you
@@ -42,7 +42,6 @@ namespace EmotePlusPlus.Services
         {
             _discord = services.GetRequiredService<DiscordSocketClient>();
             _database = services.GetRequiredService<LiteDatabase>();
-            twiceCord = _discord.Guilds.FirstOrDefault(x => x.Id == 138194444645040128);
 
             _discord.Ready += OnReady;
         }
@@ -57,6 +56,7 @@ namespace EmotePlusPlus.Services
 
             foreach (var channel in channels)
             {
+                int counter = 0;
                 Console.WriteLine(channel.Name);
                 var lastUpdate = LastChannelUpdate(channel.Id);
                 var firstMessage = (await (channel as ISocketMessageChannel).GetMessagesAsync(1).FlattenAsync()).First();
@@ -93,7 +93,7 @@ namespace EmotePlusPlus.Services
                 UpdateLastChannelUpdate(channel.Id, firstMessage.Timestamp);
             }
 
-            CanAcceptNewUpdates = true;
+            // CanAcceptNewUpdates = true;
             
             _discord.Ready -= OnReady;
         }
@@ -144,7 +144,6 @@ namespace EmotePlusPlus.Services
                     channelUpdate.LastUpdate = offset.UtcDateTime;
                     channelUpdateCollection.Upsert(channelUpdate);
                 }
-
             }
         }
 
