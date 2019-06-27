@@ -495,17 +495,23 @@ namespace EmotePlusPlus.Services
 
         private List<EmoteQueryResult> GetComplement(List<EmoteQueryResult> list)
         {
-            var unusedEmotes = twiceCord.Emotes
-                .Where(serverEmote => !list.Any(emote => emote.Id == serverEmote.Id))
-                .Select(serverEmote => new EmoteQueryResult
-                {
-                    Animated = serverEmote.Animated,
-                    Id = serverEmote.Id,
-                    Name = serverEmote.Name,
-                    Uses = 0
-                })
-                .ToList();
-
+            List<EmoteQueryResult> unusedEmotes = null;
+            try
+            {
+                 unusedEmotes = twiceCord.Emotes
+                    .Where(serverEmote => !list.Any(emote => emote.Id == serverEmote.Id))
+                    .Select(serverEmote => new EmoteQueryResult
+                    {
+                        Animated = serverEmote.Animated,
+                        Id = serverEmote.Id,
+                        Name = serverEmote.Name,
+                        Uses = 0
+                    })
+                    .ToList();
+            } catch (Exception ex)
+            {
+                Console.WriteLine(ex.ToString());
+            }
             list.AddRange(unusedEmotes);
             return list;
         }
