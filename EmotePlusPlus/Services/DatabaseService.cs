@@ -56,7 +56,7 @@ namespace EmotePlusPlus.Services
 
             foreach (var channel in channels)
             {
-                int counter = 0;
+                int counter = 1;
                 Console.WriteLine(channel.Name);
                 var lastUpdate = LastChannelUpdate(channel.Id);
                 var firstMessage = (await (channel as ISocketMessageChannel).GetMessagesAsync(1).FlattenAsync()).First();
@@ -78,6 +78,7 @@ namespace EmotePlusPlus.Services
                 {
                     Console.Write($"{string.Format("{0:n0}", counter)}, ");
                     var messages = await (channel as ISocketMessageChannel).GetMessagesAsync(lastMessage, Direction.Before, 100, CacheMode.AllowDownload).FlattenAsync();
+                    counter += messages.Count();
                     foreach (var message in messages)
                     {
                         try
