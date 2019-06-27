@@ -12,7 +12,7 @@ namespace EmotePlusPlus.Services
 {
     public class DatabaseService
     {
-        public bool CanAcceptNewUpdates { get; set; } = true;
+        public bool CanAcceptNewUpdates { get; set; } = false;
         public ulong[] ChannelIds { get; set; } = {
             138194444645040128, //general
             168088911812362240, //fancy-you
@@ -44,7 +44,7 @@ namespace EmotePlusPlus.Services
             _database = services.GetRequiredService<LiteDatabase>();
             twiceCord = _discord.Guilds.FirstOrDefault(x => x.Id == 138194444645040128);
 
-            _discord.Ready += OnReady;
+            //_discord.Ready += OnReady;
         }
 
         private async Task OnReady()
@@ -54,43 +54,64 @@ namespace EmotePlusPlus.Services
             CanAcceptNewUpdates = false;
 
             var channels = twiceCord.Channels.Where(x => x.GetType() == typeof(SocketTextChannel) && ChannelIds.Contains(x.Id));
-
+            channels = channels.Where(x => x.Id == 168088911812362240);
             foreach (var channel in channels)
             {
-                Console.WriteLine(channel.Name);
-                var lastUpdate = LastChannelUpdate(channel.Id);
-                var firstMessage = (await (channel as ISocketMessageChannel).GetMessagesAsync(1).FlattenAsync()).First();
-                if (firstMessage.Tags.Any(x => x.Type == TagType.Emoji) && firstMessage.Timestamp > lastUpdate)
-                    Update(firstMessage.Tags, firstMessage.Author.Id, firstMessage.Channel.Id, firstMessage.Timestamp, false, DateTimeOffset.UtcNow);
-
-                var lastMessage = firstMessage;
-                bool done = firstMessage.Timestamp <= lastUpdate;
-
-                while (!done)
+                try
                 {
-                    Console.Write(".");
-                    var messages = await (channel as ISocketMessageChannel).GetMessagesAsync(lastMessage, Direction.Before, 100, CacheMode.AllowDownload).FlattenAsync();
-                    foreach (var message in messages)
-                    {
-                        if (message.Tags.Any(x => x.Type == TagType.Emoji) && message.Timestamp > lastUpdate)
-                            Update(message.Tags, message.Author.Id, message.Channel.Id, message.Timestamp, false, DateTimeOffset.UtcNow);
-                    }
+                    int counter = 1;
+                    Console.WriteLine(channel.Name);
+                    var lastUpdate = LastChannelUpdate(channel.Id);
+                    var firstMessage = (await (channel as ISocketMessageChannel).GetMessagesAsync(1).FlattenAsync()).First();
+                    if (firstMessage.Tags.Any(x => x.Type == TagType.Emoji) && firstMessage.Timestamp > lastUpdate)
+                        Update(firstMessage.Tags, firstMessage.Author.Id, firstMessage.Channel.Id, firstMessage.Timestamp, false, DateTimeOffset.UtcNow);
 
-                    if (!messages.Any())
+                    var lastMessage = firstMessage;
+                    bool done = firstMessage.Timestamp <= lastUpdate;
+
+                    while (!done)
                     {
-                        done = true;
-                    }
-                    else
-                    {
-                        lastMessage = messages.Last();
-                        if (lastMessage.Timestamp < lastUpdate)
+                        try
                         {
-                            done = true;
+                            Console.WriteLine(counter);
+                            var messages = await (channel as ISocketMessageChannel).GetMessagesAsync(lastMessage, Direction.Before, 100, CacheMode.AllowDownload).FlattenAsync();
+                            counter += messages.Count();
+                            foreach (var message in messages)
+                            {
+                                try
+                                {
+                                    if (message.Tags.Any(x => x.Type == TagType.Emoji) && message.Timestamp > lastUpdate)
+                                        Update(message.Tags, message.Author.Id, message.Channel.Id, message.Timestamp, false, DateTimeOffset.UtcNow);
+                                }
+                                catch (Exception ex)
+                                {
+                                    Console.WriteLine("Message - " + ex.ToString());
+                                }
+                            }
+
+                            if (!messages.Any())
+                            {
+                                done = true;
+                            }
+                            else
+                            {
+                                lastMessage = messages.Last();
+                                if (lastMessage.Timestamp < lastUpdate)
+                                {
+                                    done = true;
+                                }
+                            }
+                        } catch (Exception ex)
+                        {
+                            Console.WriteLine("Batch - "+ex.ToString());
                         }
                     }
-                }
 
-                UpdateLastChannelUpdate(channel.Id, firstMessage.Timestamp);
+                    UpdateLastChannelUpdate(channel.Id, firstMessage.Timestamp);
+                } catch (Exception ex)
+                {
+                    Console.WriteLine("Channel - "+ex.ToString());
+                }
             }
 
             CanAcceptNewUpdates = true;
@@ -496,17 +517,23 @@ namespace EmotePlusPlus.Services
 
         private List<EmoteQueryResult> GetComplement(List<EmoteQueryResult> list)
         {
-            var unusedEmotes = twiceCord.Emotes
-                .Where(serverEmote => !list.Any(emote => emote.Id == serverEmote.Id))
-                .Select(serverEmote => new EmoteQueryResult
-                {
-                    Animated = serverEmote.Animated,
-                    Id = serverEmote.Id,
-                    Name = serverEmote.Name,
-                    Uses = 0
-                })
-                .ToList();
-
+            List<EmoteQueryResult> unusedEmotes = null;
+            try
+            {
+                 unusedEmotes = twiceCord.Emotes
+                    .Where(serverEmote => !list.Any(emote => emote.Id == serverEmote.Id))
+                    .Select(serverEmote => new EmoteQueryResult
+                    {
+                        Animated = serverEmote.Animated,
+                        Id = serverEmote.Id,
+                        Name = serverEmote.Name,
+                        Uses = 0
+                    })
+                    .ToList();
+            } catch (Exception ex)
+            {
+                Console.WriteLine(ex.ToString());
+            }
             list.AddRange(unusedEmotes);
             return list;
         }
