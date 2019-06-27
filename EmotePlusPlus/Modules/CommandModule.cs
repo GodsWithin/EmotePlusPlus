@@ -94,11 +94,9 @@ namespace EmotePlusPlus.Modules
                     await ReplyAsync("No normal emotes have been used on this server.");
                 }
             }
-
-            
         }
 
-        [Command("top gif")]
+        [Command("topgif")]
         public async Task TopGif()
         {
             var emotes = DatabaseService.GetTop(true);
@@ -113,6 +111,29 @@ namespace EmotePlusPlus.Modules
             else
             {
                 await ReplyAsync("No gif emotes have been used on this server.");
+            }
+        }
+
+        [Command("topgif")]
+        public async Task TopGifPeriod([Remainder] string date)
+        {
+            bool dateParsed = DateTime.TryParseExact(date, "MMMM yyyy", CultureInfo.InvariantCulture, DateTimeStyles.None, out DateTime period);
+
+            if (dateParsed)
+            {
+                var emotes = DatabaseService.GetTopPeriod(true, period);
+                if (emotes.Any())
+                {
+                    for (int i = 0; i < emotes.Count; i += 50)
+                    {
+                        string result = string.Join("\n", emotes.Skip(i).Take(50));
+                        await ReplyAsync(result);
+                    }
+                }
+                else
+                {
+                    await ReplyAsync("No normal emotes have been used on this server.");
+                }
             }
         }
 
@@ -133,7 +154,7 @@ namespace EmotePlusPlus.Modules
             }
         }
 
-        [Command("top normal")]
+        [Command("topnormal")]
         public async Task TopUserNormal(IGuildUser user)
         {
             var emotes = DatabaseService.GetTopUser(false, user.Id);
@@ -154,7 +175,7 @@ namespace EmotePlusPlus.Modules
             }
         }
 
-        [Command("top gif")]
+        [Command("topgif")]
         public async Task TopUserGif(IGuildUser user)
         {
             var emotes = DatabaseService.GetTopUser(true, user.Id);
@@ -197,6 +218,29 @@ namespace EmotePlusPlus.Modules
             }
         }
 
+        [Command("top")]
+        public async Task TopChannelPeriodAll(SocketTextChannel channel, [Remainder] string date)
+        {
+            bool dateParsed = DateTime.TryParseExact(date, "MMMM yyyy", CultureInfo.InvariantCulture, DateTimeStyles.None, out DateTime period);
+
+            if (dateParsed)
+            {
+                var emotes = DatabaseService.GetTopChannelPeriodAll(period, channel.Id);
+                if (emotes.Any())
+                {
+                    for (int i = 0; i < emotes.Count; i += 50)
+                    {
+                        string result = string.Join("\n", emotes.Skip(i).Take(50));
+                        await ReplyAsync(result);
+                    }
+                }
+                else
+                {
+                    await ReplyAsync("There haven't been any emotes used in that channel.");
+                }
+            }
+        }
+
         #endregion
 
         #region User and channel specific commands
@@ -222,7 +266,7 @@ namespace EmotePlusPlus.Modules
             }
         }
 
-        [Command("top normal")]
+        [Command("topnormal")]
         public async Task TopUserChannelNormal(IGuildUser user, SocketTextChannel channel)
         {
             var emotes = DatabaseService.GetTopUserChannel(false, user.Id, channel.Id);
@@ -243,7 +287,7 @@ namespace EmotePlusPlus.Modules
             }
         }
 
-        [Command("top gif")]
+        [Command("topgif")]
         public async Task TopUserChannelGif(IGuildUser user, SocketTextChannel channel)
         {
             var emotes = DatabaseService.GetTopUserChannel(true, user.Id, channel.Id);
@@ -356,13 +400,12 @@ namespace EmotePlusPlus.Modules
         }
 
         [Command("check")]
-        public async Task CheckEmoteDateUser(string emoteString, IGuildUser user, [Remainder] string date)
+        public async Task CheckEmoteDateUserChannel(string emoteString, IGuildUser user, SocketTextChannel channel)
         {
             bool success = Emote.TryParse(emoteString, out Emote emote);
-            bool dateParsed = DateTime.TryParseExact(date, "MMMM yyyy", CultureInfo.InvariantCulture, DateTimeStyles.None, out DateTime period);
-            if (success && dateParsed)
+            if (success)
             {
-                var result = DatabaseService.GetEmotePeriodUserData(emote, user.Id, period);
+                var result = DatabaseService.GetEmoteUserChannelData(emote, user.Id, channel.Id);
                 if (result != null)
                 {
                     await ReplyAsync(result.ToString());
